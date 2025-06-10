@@ -168,7 +168,7 @@ A file named `drift_report.html` will be generated in your project directory eve
 * **Model Choice**: Easily swap `LogisticRegression` in `model_training.py` with other scikit-learn models (e.g., `RandomForestClassifier`, `GradientBoostingClassifier`).
 * **Drift Thresholds**: Adjust `DRIFT_THRESHOLD_P_VALUE` in `mlops_orchestrator.py` to make drift detection more or less sensitive.
 * **Intervals**: Modify `RETRAIN_INTERVAL_SECONDS` and `DRIFT_CHECK_INTERVAL_SECONDS` to control how frequently the pipeline performs its tasks.
-* **Data Generation**: Modify `data_generator.py` to change the distribution or introduce different types of patterns/noise in the simulated data.
+* **Data Generation**: Modify `data_simulator.py` to change the distribution or introduce different types of patterns/noise in the simulated data.
 * **Data Balancing Strategy**: Change `RandomUnderSampler` to `SMOTE` or other `imblearn` techniques in `data_preparation.py` if oversampling is preferred.
 
 ---
@@ -178,7 +178,7 @@ A file named `drift_report.html` will be generated in your project directory eve
 * **MongoDB Connection Errors**: Double-check your `MONGO_URI`, network connectivity, and MongoDB Atlas IP access list.
 * **Evidently Errors**: Ensure your `evidently` library version is compatible with the code. If you encounter `unexpected keyword argument` errors, it's likely a version mismatch. Consider running `pip install --upgrade evidently` and adjusting the `mlops_orchestrator.py` code to match the latest Evidently API (as discussed in previous interactions, this might involve changes around `column_mapping` or `ClassificationPreset` arguments like `task_type`).
 * **`No data found in MongoDB`**: Make sure `data_simulator.py` is running and successfully inserting documents before starting the orchestrator.
-* **100% Accuracy**: This was intentionally addressed by introducing `FLIP_PROBABILITY` in `data_generator.py`. If you still see 100%, increase the `FLIP_PROBABILITY`.
+* **100% Accuracy**: This was intentionally addressed by introducing `FLIP_PROBABILITY` in `data_simulator.py`. If you still see 100%, increase the `FLIP_PROBABILITY`.
 * **Empty DataFrames in Evidently**: Ensure enough new data has been collected between drift checks (`DRIFT_CHECK_INTERVAL_SECONDS`).
 
 ---
