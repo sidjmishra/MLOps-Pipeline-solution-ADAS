@@ -1,0 +1,46 @@
+{
+    "data_config": {
+        "target_column_name": "intervention_needed",
+        "columns_to_drop": ["_id", "record_id", "timestamp", "gps_latitude", "gps_longitude"],
+        "numerical_features": [
+            "vehicle_speed_kmh", 
+            "distance_to_obstacle_m", 
+            "driver_attention_level",
+            "steering_angle_degrees", 
+            "accelerator_pedal_position", 
+            "brake_pedal_position"
+        ],
+        "categorical_features": [
+            "weather_conditions", 
+            "road_type", 
+            "light_conditions"
+        ],
+        "boolean_features": [
+            "lane_departure_warning",
+            "front_collision_warning"
+        ]
+    },
+    "ml_task_config": {
+        "task_type": "classification", 
+        "model_type": "logistic_regression",
+        "model_hyperparameters": {
+            "random_state": 42,
+            "solver": "liblinear",
+            "max_iter": 1000,
+            "class_weight": "balanced"
+        },
+        "evaluation_metrics": ["accuracy", "precision", "recall", "f1_score"],
+        "main_metric_for_deployment": "f1_score" 
+    },
+    "pipeline_config": {
+        "retrain_interval_seconds": 3600,
+        "drift_check_interval_seconds": 900,
+        "min_data_for_training": 500,
+        "performance_degradation_threshold": 0.95
+    },
+    "mongodb_config": {
+        "mongo_uri": "mongodb+srv://siddhantmishra:siddhantmishra@csgdemo.ixcusej.mongodb.net/?retryWrites=true&w=majority&appName=CSGDemo",
+        "database_name": "mlops_pipeline",
+        "collection_name": "sensor_readings"
+    }
+}

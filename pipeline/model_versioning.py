@@ -51,16 +51,3 @@ def get_latest_model_version():
     latest_model_file = model_files[0]
     version_name = latest_model_file.replace('.pkl', '')
     return version_name
-
-# if __name__ == "__main__":
-#     from sklearn.linear_model import LogisticRegression
-#     dummy_model = LogisticRegression()
-#     dummy_metrics = {'accuracy': 0.85, 'f1_score': 0.78}
-
-#     version, path = save_model(dummy_model, dummy_metrics)
-
-#     latest_version = get_latest_model_version()
-#     if latest_version:
-#         loaded_model, loaded_metrics = load_model(latest_version)
-#         print(f"Loaded model version: {latest_version}")
-#         print(f"Loaded metrics: {loaded_metrics}")

@@ -7,12 +7,11 @@ from pymongo.errors import ConnectionFailure, OperationFailure
 
 fake = Faker()
 
-MONGO_URI = "MONGO-URL"
+MONGO_URI = "mongodb+srv://siddhantmishra:siddhantmishra@csgdemo.ixcusej.mongodb.net/?retryWrites=true&w=majority&appName=CSGDemo"
 DATABASE_NAME = "mlops_pipeline"
 COLLECTION_NAME = "sensor_readings"
 
-# Define a probability to introduce noise in the intervention_needed flag
-FLIP_PROBABILITY = 0.08 # 8% chance to flip the intervention_needed flag
+FLIP_PROBABILITY = 0.08
 
 def get_mongo_client():
     try:
@@ -77,16 +76,14 @@ def generate_adas_record(record_id: int):
     latitude = round(random.uniform(18.9, 19.3), 6)
     longitude = round(random.uniform(72.7, 73.1), 6)
 
-    # Deterministically calculate intervention_needed first
     intervention_needed = False
     if (front_collision_warning or lane_departure_warning or 
         (distance_obstacle < 5 and vehicle_speed > 60) or 
         (driver_attention < 50 and vehicle_speed > 30)):
         intervention_needed = True
 
-    # Introduce noise: randomly flip the intervention_needed flag
     if random.random() < FLIP_PROBABILITY:
-        intervention_needed = not intervention_needed # Flip the boolean value
+        intervention_needed = not intervention_needed
 
     return {
         "record_id": record_id,

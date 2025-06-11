@@ -1,6 +1,9 @@
 from pydantic import BaseModel
 from typing import Dict, Any
 
+class DataInput(BaseModel):
+    data: dict
+
 class ADASData(BaseModel):
     vehicle_speed_kmh: float
     distance_to_obstacle_m: float

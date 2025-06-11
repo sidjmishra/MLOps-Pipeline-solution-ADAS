@@ -6,150 +6,110 @@ from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
 
+def fetch_data_from_mongodb(config):
+    mongo_uri = config['mongodb_config']['mongo_uri']
+    database_name = config['mongodb_config']['database_name']
+    collection_name = config['mongodb_config']['collection_name']
+    client = None
+    try:
+        client = MongoClient(mongo_uri)
+        db = client[database_name]
+        collection = db[collection_name]
 
-MONGO_URI = "MONGO-URL"
-DATABASE_NAME = "mlops_pipeline"
-COLLECTION_NAME = "sensor_readings"
-
-def fetch_data_from_mongodb():
-    client = MongoClient(MONGO_URI)
-    db = client[DATABASE_NAME]
-    collection = db[COLLECTION_NAME]
-    
-    data = list(collection.find({}))
-    client.close()
-    print(f"Fetched {len(data)} records from MongoDB.")
-    if not data:
-        print("Warning: No data found in MongoDB collection.")
+        data = list(collection.find({}))
+        df = pd.DataFrame(data)
+        print(f"Fetched {len(df)} records from MongoDB.")
+        return df
+    except Exception as e:
+        print(f"Error fetching data from MongoDB: {e}")
         return pd.DataFrame()
-    return pd.DataFrame(data)
+    finally:
+        if client:
+            client.close()
 
-def prepare_data(df):
+def prepare_data(df, config):
+    data_config = config['data_config']
+    target_column = data_config['target_column_name']
+    drop_columns = data_config['columns_to_drop']
+    numerical_features = data_config['numerical_features']
+    categorical_features = data_config['categorical_features']
+    boolean_features = data_config['boolean_features']
+    
+    ml_task_type = config['ml_task_config']['task_type']
+
     if df.empty:
         print("DataFrame is empty, cannot prepare data.")
         return None, None, None, None, None
 
-    print("\n--- Starting Data Cleaning ---")
+    df = df.drop(columns=drop_columns, errors='ignore')
 
-    if '_id' in df.columns:
-        df = df.drop(columns=['_id'])
-
-    df = df.drop(columns=['record_id', 'gps_latitude', 'gps_longitude'])
-    
     initial_rows = df.shape[0]
     df.drop_duplicates(inplace=True)
-    rows_after_duplicates = df.shape[0]
-    print(f"Dropped {initial_rows - rows_after_duplicates} duplicate rows.")
+    if df.shape[0] < initial_rows:
+        print(f"Dropped {initial_rows - df.shape[0]} duplicate rows.")
 
-    potential_numerical_features = df.select_dtypes(include=['number']).columns
-    potential_categorical_features = df.select_dtypes(include=['object', 'bool']).columns
+    for col in boolean_features:
+        if col in df.columns and df[col].dtype == 'bool':
+            df[col] = df[col].astype(int)
+            if col not in numerical_features:
+                numerical_features.append(col)
+        elif col in df.columns and df[col].dtype == 'object':
+             df[col] = df[col].map({'True': 1, 'False': 0, True: 1, False: 0}).fillna(0).astype(int)
+             if col not in numerical_features:
+                 numerical_features.append(col)
 
-    for col in potential_numerical_features:
-        if df[col].isnull().any():
-            median_val = df[col].median()
-            df[col].fillna(median_val, inplace=True)
-            print(f"Filled nulls in numerical column '{col}' with median: {median_val}")
 
-    for col in potential_categorical_features:
-        if df[col].isnull().any():
-            mode_val = df[col].mode()[0]
-            df[col].fillna(mode_val, inplace=True)
-            print(f"Filled nulls in categorical/boolean column '{col}' with mode: {mode_val}")
-
-    rows_after_nulls = df.shape[0]
-    print(f"Handled null values. Current rows: {rows_after_nulls}")
+    for col in numerical_features:
+        if col in df.columns:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].median(), inplace=True)
+                print(f"Imputed missing values in numerical column '{col}' with median.")
     
-    if df.isnull().sum().sum() > 0:
-        print(f"Warning: {df.isnull().sum().sum()} null values remaining after imputation. Dropping rows with nulls.")
-        df.dropna(inplace=True)
-        print(f"Dropped {rows_after_nulls - df.shape[0]} rows due to remaining nulls.")
+    for col in categorical_features:
+        if col in df.columns:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].mode()[0], inplace=True)
+                print(f"Imputed missing values in categorical column '{col}' with mode.")
 
+    X = df.drop(columns=[target_column], errors='ignore')
+    y = df[target_column]
 
-    print("\n--- Starting Feature Engineering & Preprocessing ---")
+    if y.dtype == 'bool':
+        y = y.astype(int)
 
-    df = df.drop(columns=['record_id', 'timestamp'], errors='ignore')
-
-    if 'intervention_needed' not in df.columns:
-        print("Error: 'intervention_needed' column not found after cleaning. Cannot prepare data.")
-        return None, None, None, None, None
-
-    X = df.drop('intervention_needed', axis=1)
-    y = df['intervention_needed'].astype(int)
-
-    categorical_features = X.select_dtypes(include=['object', 'bool']).columns.tolist()
-    numerical_features = X.select_dtypes(include=['number']).columns.tolist()
-    
-    if not numerical_features:
-        print("Warning: No numerical features found.")
-        numerical_transformer = 'drop'
-    else:
-        numerical_transformer = StandardScaler()
-
-    if not categorical_features:
-        print("Warning: No categorical features found.")
-        categorical_transformer = 'drop'
-    else:
-        categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+    numerical_transformer = StandardScaler()
+    categorical_transformer = OneHotEncoder(handle_unknown='ignore')
 
     preprocessor = ColumnTransformer(
         transformers=[
-            ('num', numerical_transformer, numerical_features),
-            ('cat', categorical_transformer, categorical_features)
+            ('num', numerical_transformer, [f for f in numerical_features if f in X.columns]),
+            ('cat', categorical_transformer, [f for f in categorical_features if f in X.columns])
         ],
         remainder='passthrough'
     )
 
-    # --- Apply preprocessing BEFORE splitting ---
-    # The preprocessor needs to be fitted on the entire dataset (or training set)
-    # for consistent transformation of train and test data.
-    if not X.empty:
-        X_processed = preprocessor.fit_transform(X)
-        if hasattr(X_processed, 'toarray'):
-            X_processed = X_processed.toarray()
-    else:
-        print("Warning: No features left after cleaning for processing.")
-        return None, None, None, None, None
+    X_processed = preprocessor.fit_transform(X)
     
-    # Save the preprocessor AFTER fitting but BEFORE splitting
-    # This preprocessor will be used for both training and later for inference
-    joblib.dump(preprocessor, 'preprocessor.pkl')
-    print("Preprocessor saved to preprocessor.pkl")
-
-    # --- Split data into training and testing sets FIRST ---
-    # This is CRUCIAL to prevent data leakage from SMOTE
     X_train, X_test, y_train, y_test = train_test_split(
-        X_processed, y, test_size=0.2, random_state=42, stratify=y
+        X_processed, y, test_size=0.2, random_state=42, stratify=y if ml_task_type == 'classification' else None
     )
-    
-    print(f"Data split: Training samples={X_train.shape[0]}, Test samples={X_test.shape[0]}")
-    print(f"Original training class distribution: \n{pd.Series(y_train).value_counts()}")
 
-    # --- Data Balancing (SMOTE) ONLY on the Training Data ---
-    print("\n--- Starting Data Balancing (SMOTE) on Training Data ---")
-    if pd.Series(y_train).value_counts().min() < pd.Series(y_train).value_counts().max():
-        smote = SMOTE(random_state=42)
-        X_train_resampled, y_train_resampled = smote.fit_resample(X_train, y_train)
-        print(f"Resampled training class distribution: \n{pd.Series(y_train_resampled).value_counts()}")
-        X_train = X_train_resampled
-        y_train = y_train_resampled
+    if ml_task_type == 'classification':
+        print("Checking for imbalanced data...")
+        class_counts = y_train.value_counts()
+        print(f"Original training set class distribution: {class_counts.to_dict()}")
+        
+        rus = RandomUnderSampler(random_state=42)
+        X_train_resampled, y_train_resampled = rus.fit_resample(X_train, y_train)
+        print(f"Resampled training set class distribution: {y_train_resampled.value_counts().to_dict()}")
+        
+        joblib.dump(preprocessor, 'artefacts/preprocessor.pkl')
+        print("Preprocessor saved as 'artefacts/preprocessor.pkl'.")
+        
+        return X_train_resampled, X_test, y_train_resampled, y_test, preprocessor
     else:
-        print("Training dataset is already balanced or has only one class. Skipping SMOTE.")
-    
-    return X_train, X_test, y_train, y_test, preprocessor
-
-# if __name__ == "__main__":
-#     print("Running data_preparation.py in standalone mode for testing.")
-#     raw_data_df = fetch_data_from_mongodb()
-#     if not raw_data_df.empty:
-#         X_train, X_test, y_train, y_test, preprocessor = prepare_data(raw_data_df)
-#         if X_train is not None:
-#             print("\nData Preparation Complete.")
-#             print(f"Shape of X_train: {X_train.shape}")
-#             print(f"Shape of y_train: {y_train.shape}")
-#             print(f"Shape of X_test: {X_test.shape}")
-#             print(f"Shape of y_test: {y_test.shape}")
-#         else:
-#             print("Data preparation did not yield valid training/test sets.")
-#     else:
-#         print("No data fetched from MongoDB to prepare.")
+        joblib.dump(preprocessor, 'artefacts/preprocessor.pkl')
+        print("Preprocessor saved as 'artefacts/preprocessor.pkl'.")
+        return X_train, X_test, y_train, y_test, preprocessor
