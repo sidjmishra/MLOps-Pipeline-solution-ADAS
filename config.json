@@ -39,7 +39,7 @@
         "performance_degradation_threshold": 0.95
     },
     "mongodb_config": {
-        "mongo_uri": "mongodb+srv://siddhantmishra:siddhantmishra@csgdemo.ixcusej.mongodb.net/?retryWrites=true&w=majority&appName=CSGDemo",
+        "mongo_uri": "MONGO_URI",
         "database_name": "mlops_pipeline",
         "collection_name": "sensor_readings"
     }
