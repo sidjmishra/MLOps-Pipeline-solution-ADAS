@@ -7,7 +7,7 @@ from pymongo.errors import ConnectionFailure, OperationFailure
 
 fake = Faker()
 
-MONGO_URI = "mongodb+srv://siddhantmishra:siddhantmishra@csgdemo.ixcusej.mongodb.net/?retryWrites=true&w=majority&appName=CSGDemo"
+MONGO_URI = "MONGO_URI"
 DATABASE_NAME = "mlops_pipeline"
 COLLECTION_NAME = "sensor_readings"
 
